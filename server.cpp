@@ -1,5 +1,25 @@
 //
-// Created by Ashton Hess on 3/17/22.
+// Created by Ashton Hess on 3/17/22. -> Migrating so I can use my Mac. Now using makefiles instead of VS.
+// Pawprint: AAHB8F
+//
+//
+// Program description:
+// I implemented a simple chat room in c++ with both a server and client that both use
+//the socket API. The client program provides the following commands to the user: 'login'(allow users to join the chat room),
+// 'newuser'(create a new user account), 'send'(send a message to other clients; actually send the message to the server and
+// the server forwards the message to other clients), and 'logout'(quit the chat room).
+//
+// The server runs the chat room service and echoes messages back to the client.
+// Storage of all users that are created is implemented to store a list in users.txt.
+//
+//
+// How to run:
+// First, you will need a C++14 compiler installed.
+// Second, navigate to each program's folder in terminal.
+// Third, run the command "make" in each terminal. This will create the object files and the executables.
+// Last, run the command "./server" in the server terminal, and "./client" (appending the server address argument) in the client's terminal.
+//
+// Note: To clean, run make clean in both project directories.
 //
 #include <iostream>
 using namespace std;
@@ -14,6 +34,7 @@ using namespace std;
 #include <sstream>
 #include <vector>
 #include <iterator>
+#include <cstring>
 
 #include "User.h"
 
@@ -24,7 +45,7 @@ using namespace std;
 int login(string userID, string password);
 int newUser(string userID, string password);
 int sendMessage(char*message);
-int logout();
+int logout(string userID);
 vector<User> readUsersFromFile(const string& fileName);
 void printUsers(vector<User> usersVec);
 void addUserToFile(const string& fileName, User userToAdd);
@@ -32,20 +53,21 @@ vector<string> split (const string &s, char delim);
 
 //returning 0 for success, 1 for failure.
 int main(int argc, char*argv[]){
+try{
 
-    //User*testUser = new User("testUserIDNEW","testPasswordNEW");
     string fileName = "users.txt";
+    const char *welcomeMsg = "> Ashton's chat room server. Version One.\n";
+
     vector<User> users;
     //Ensure error checks on size of users after reading in file data.
     users = readUsersFromFile(fileName);
-    //Buffer to hold current message.
-    char msgBuf[MAX_LINE] = {};
     //File descriptor for stocket.
     int serverFD;
-    //
+    //stores the accepted socket connection
     int currentSocket;
-    int valRead;
-    int opt = 1;
+    /*//Buffer to hold current message.
+      char msgBuf[MAX_LINE] = {};*/
+
     //setting up my socket.
     //creating FD (file descriptor) for socket.
     if ((serverFD = socket(AF_INET,SOCK_STREAM,0)) == 0){
@@ -53,6 +75,7 @@ int main(int argc, char*argv[]){
         return 1;
     }
     //attaching socket to SERVER_PORT.
+    int opt = 1;
     if(setsockopt(serverFD, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt))){
         cout<<"> Error: setsockopt()"<<endl;
         return 1;
@@ -61,21 +84,24 @@ int main(int argc, char*argv[]){
     addy.sin_family = AF_INET;
     addy.sin_addr.s_addr = INADDR_ANY;
     addy.sin_port = htons(SERVER_PORT);//host byte order->network byte order
+    //Binding socket
     //Must use scope resolution operator '::' here to call bind() from the socket import,
     // since I'm using the std namespace. This is because std::bind() also exists.
     if (::bind(serverFD, (struct sockaddr *)&addy, sizeof(addy)) < 0 ){
         cout<<"> Error: binding socket."<<endl;
         return 1;
     }
+    //listening on the socket for a new connection. Next, accept a socket connection and store it
     if (listen(serverFD, MAX_PENDING) < 0) {
-        //listening on the socket for a new connection. Next, accept a socket connection and store it
         cout<<"> Error: listening on socket."<<endl;
         return 1;
     }
-    cout<<"> Ashton's chat room server. Version One."<<endl<<endl;
+
+    cout<<welcomeMsg<<endl;
     //cout<<"Waiting for a client to connect..."<<endl;
+
     string userID;
-    bool isLoggedIn=false;
+    bool logInStatus=false;
     bool while1=true;
     bool while2=true;
     while(while1) {
@@ -84,70 +110,91 @@ int main(int argc, char*argv[]){
             cout<<"> Error: accepting the socket."<<endl;
             return 1;
         }
-
-        printf("%s\n", msgBuf);
-        const char *welcomeMsg = "Ashton's chat room client. Version 1.";
-        send(currentSocket, welcomeMsg, strlen(welcomeMsg), 0);
-        //cout<<"Welcome message sent."<<endl;
         while(while2){
-            char buffer[MAX_LINE];
+            char buffer[MAX_LINE] ="";
             char placeholder[MAX_LINE]="";
-            //valRead = read(newSocket, msgBuf, MAX_LINE);
-            int i = recv(currentSocket, buffer, MAX_LINE, 0);
+            long int i = recv(currentSocket, buffer, MAX_LINE, 0);
             //cout<<"VALUE OF I: "<<i<<endl;
             if (i==-1){
                 close(currentSocket);
-                cout<<"Error: Closed socket."<<endl;
+                cout<<"> Error: Closed socket."<<endl;
                 break;
             }
-            cout<<buffer<<endl;
+            //cout<<buffer<<endl;
+            string storedBuffer;
+            if (!storedBuffer.empty()){
+                storedBuffer= buffer;
+            }
+            vector<string> delimitVec;
+            delimitVec = split(buffer,' ');
+            if (delimitVec.at(0)=="login"){
+                    int loginResult= login(delimitVec.at(1),delimitVec.at(2));
+                    //return 0 for user does not exist; return 1 for login success; return 2 for wrong password.
+                    if (loginResult!=1){
+                        const char *loginFail= "> Denied. User name or password incorrect.";
+                        strcpy(buffer, loginFail);
+                        send(currentSocket, buffer, strlen(buffer), 0);
+                        userID = delimitVec.at(1);
+                    }else{
+                        logInStatus=true;
+                        const char *logInSuccessMsg= "> login confirmed";
+                        strcpy(buffer, logInSuccessMsg);
+                        send(currentSocket, buffer, strlen(buffer), 0);
+                        userID = delimitVec.at(1);
+                        cout<<userID<<" login."<<endl;
+                    }
+            }else if (delimitVec.at(0)=="newuser"){
+                //Create a new user account; returns 0 if userID account already exists; returns 1 if user successfully added.
+                int newUserResult = newUser(delimitVec.at(1), delimitVec.at(2));
+                if (newUserResult==1){
+                    cout<<"New user account created."<<endl;//---------------------------------------------------------------NEEDED--------------------------------------------------------------------------
+                    const char *userAcctCreatedSuccess= "> New user account created. Please login.";
+                    strcpy(buffer, userAcctCreatedSuccess);
+                    send(currentSocket, buffer, strlen(buffer), 0);
+                }else{
+                    const char *userAcctExists= "> Denied. User account already exists.";
+                    strcpy(buffer, userAcctExists);
+                    send(currentSocket, buffer, strlen(buffer), 0);
+                }
+            }else if (delimitVec.at(0)=="send"){
+                if (logInStatus==true){
+                    string totalMessage=userID+": ";
+                    for (auto t=delimitVec.begin()+1; t!=delimitVec.end(); ++t)
+                    {
+                        totalMessage=totalMessage+*t+' ';
+                    }
+                    cout<<totalMessage<<endl;
+                    string totalMessageToSend="> "+totalMessage;
+                    const char *sendMsg= totalMessageToSend.c_str();
+                    strcpy(buffer, sendMsg);
+                    send(currentSocket, buffer, strlen(buffer), 0);
+                }else{
+                    //cout<<"> Denied. Please login first."<<endl;
+                    const char *loginBefore= "> Denied. Please login first.";
+                    strcpy(buffer, loginBefore);
+                    send(currentSocket, buffer, strlen(buffer), 0);
+                }
+            }else if (delimitVec.at(0)=="logout") {
+                if (logInStatus == true) {
+                    logout(userID);
+                    userID = "";
+                    const char *logoutMsg= "> You left.";
+                    strcpy(buffer, logoutMsg);
+                    send(currentSocket, buffer, strlen(buffer), 0);
+                }else{
+                    const char *logoutNotLoggedIn= "> Denied. Please login first.";
+                    strcpy(buffer, logoutNotLoggedIn);
+                    send(currentSocket, buffer, strlen(buffer), 0);
+                }
+            }
 
-
-        } //END OUTER WHILE
-    }
-    return 0;
+        } //END INNER WHILE
+    }//END OUTER WHILE
+}catch(std::out_of_range){
+    //catching any unexpected exceptions that can occur with the vectors.
 }
-//            buffer[i]=0;
-//            vector<string> delimitVec = split(buffer,' ');
-//            if(delimitVec.at(0)=="login"){
-//                if(isLoggedIn==false){
-//                int loginInt = login(delimitVec.at(1),delimitVec.at(2));
-//                //return 0 for user does not exist
-//                //return 1 for login success
-//                //return 2 for wrong password
-//                if(loginInt==0){
-//                    strncpy(placeholder, "User does not exist.",sizeof(placeholder));
-//                }else if (loginInt==2){
-//                    strncpy(placeholder,"Wrong password.",sizeof(placeholder));
-//                }else{
-//                    isLoggedIn=true;
-//                    strncpy(placeholder,"Login success.", sizeof(placeholder));
-//                    //string userIDChar = delimitVec.at(1);
-//                    userID=delimitVec.at(1);
-//                    cout<<userID<<" logged in.";
-//                }
-//            }else{
-//                    cout<<"A user is already logged in."<<endl;
-//                }
-//            }else if(delimitVec.at(0)=="newuser"){
-//                int newUserInt = newUser(delimitVec.at(1),delimitVec.at(2));
-//                //returns 0 if userID account already exists
-//                //returns 1 if user successfully added.
-//                if(newUserInt==0){
-//                    cout<<"Creating new user failed. Account exists."<<endl;
-//                    strncpy(placeholder,"Creating new user failed. Account exists.",sizeof(placeholder));
-//                    break;
-//                }else if(newUserInt==1){
-//                    strncpy(placeholder,"Creating new user failed. Account exists.",sizeof(placeholder));
-//                    break;
-//                }
-//            }else if(delimitVec.at(0)=="send"){
-//                if(isLoggedIn){
-//                   // char*msg =
-//                }
-//
-//            }
-
+return 0;
+}
 
 vector<string> split (const string &s, char delim) {
     vector<string> result;
@@ -193,9 +240,6 @@ vector<User> readUsersFromFile(const string& fileName) {
             //cout<<"userID: "<<userID<<endl;
             //cout<<"password: "<<password<<endl;
             User *newUser = new User(userID, password);
-            //newUser->setUserID(userID);
-            //newUser->setPassword(password);
-            //cout << "user: " << newUser->getUserID() << " " << newUser->getPassword() << endl;
             returnVector.push_back(*newUser);
         }
         return returnVector;
@@ -204,13 +248,14 @@ vector<User> readUsersFromFile(const string& fileName) {
     }
 }
 //return 0 for user does not exist; return 1 for login success; return 2 for wrong password.
-int login(string uName, string pass){
+int login(string userID, string password){
     vector<User> allUsersVec;
     allUsersVec=readUsersFromFile("users.txt");
     for (auto it = begin (allUsersVec); it != end (allUsersVec); ++it) {
-        if(it->getUserID()==uName&&it->getPassword()==pass){
+        if(it->getUserID()==userID&&it->getPassword()==password){
+            //cout<<it->getUserID()<<" login."<<endl;//---------------------------------------------------------------NEEDED--------------------------------------------------------------------------
             return 1;
-        }else if(it->getUserID()==uName&&it->getPassword()!=pass){
+        }else if(it->getUserID()==userID&&it->getPassword()!=password){
             return 2;
         }
     }
@@ -234,17 +279,16 @@ int sendMessage(char*message){
     return 0;
 }
 //Quit the chatroom.
-int logout(){
-
-
+int logout(string userID){
+    cout<<userID<<" logout."<<endl;
+  //  cout<<it->getUserID()<<" logout."<<endl;//---------------------------------------------------------------NEEDED--------------------------------------------------------------------------
     return 0;
 }
 
-
+//This function adds a user object to the .txt file specified.
 void addUserToFile(const string& fileName, User userToAdd){
     string userString;
     userString="("+userToAdd.getUserID()+","+" "+userToAdd.getPassword()+")";
-    //cout<<endl<<"userString to append to file: "<<userString;
     ofstream outFile;
     outFile.open(fileName, std::ios_base::app);
     outFile<<endl<<userString;
@@ -256,6 +300,17 @@ void addUserToFile(const string& fileName, User userToAdd){
 
 
 //TESTING:
+
+//cout<<"> Denied. User name or password incorrect."<<endl;
+
+
+//printf("%s\n", msgBuf);
+//const char *welcomeMsg = "Ashton's chat room server. Version One.\n";
+//send(currentSocket, welcomeMsg, strlen(welcomeMsg), 0);
+//        cout<<welcomeMsg;
+
+//cout<<"> Denied. User account already exists."<<endl;
+
     //testing for login function
 //    int loginResult;
 //    loginResult=login("Tomasdf", "Tom12");
@@ -265,9 +320,55 @@ void addUserToFile(const string& fileName, User userToAdd){
 //users = readUsersFromFile(fileName);
 //printUsers(users);
 //cout<<endl;
-
+//valRead = read(newSocket, msgBuf, MAX_LINE);
+//User*testUser = new User("testUserIDNEW","testPasswordNEW");
+//logout(userID);
+//userID = "";
+//cout<<endl<<"userString to append to file: "<<userString;
+//newUser->setUserID(userID);
+//newUser->setPassword(password);
+//cout << "user: " << newUser->getUserID() << " " << newUser->getPassword() << endl;
+//old try...
+//            buffer[i]=0;
+//            vector<string> delimitVec = split(buffer,' ');
+//            if(delimitVec.at(0)=="login"){
+//                if(isLoggedIn==false){
+//                int loginInt = login(delimitVec.at(1),delimitVec.at(2));
+//                //return 0 for user does not exist
+//                //return 1 for login success
+//                //return 2 for wrong password
+//                if(loginInt==0){
+//                    strncpy(placeholder, "User does not exist.",sizeof(placeholder));
+//                }else if (loginInt==2){
+//                    strncpy(placeholder,"Wrong password.",sizeof(placeholder));
+//                }else{
+//                    isLoggedIn=true;
+//                    strncpy(placeholder,"Login success.", sizeof(placeholder));
+//                    //string userIDChar = delimitVec.at(1);
+//                    userID=delimitVec.at(1);
+//                    cout<<userID<<" logged in.";
+//                }
+//            }else{
+//                    cout<<"A user is already logged in."<<endl;
+//                }
+//            }else if(delimitVec.at(0)=="newuser"){
+//                int newUserInt = newUser(delimitVec.at(1),delimitVec.at(2));
+//                //returns 0 if userID account already exists
+//                //returns 1 if user successfully added.
+//                if(newUserInt==0){
+//                    cout<<"Creating new user failed. Account exists."<<endl;
+//                    strncpy(placeholder,"Creating new user failed. Account exists.",sizeof(placeholder));
+//                    break;
+//                }else if(newUserInt==1){
+//                    strncpy(placeholder,"Creating new user failed. Account exists.",sizeof(placeholder));
+//                    break;
+//                }
+//            }else if(delimitVec.at(0)=="send"){
+//                if(isLoggedIn){
+//                   // char*msg =
+//                }
+//            }
 //NO WORK:
-
 //    int searchResult=0;
 //    vector<User> allUsersVec;
 //    string userIDString;
@@ -288,8 +389,6 @@ void addUserToFile(const string& fileName, User userToAdd){
 //        addUserToFile("users.txt", *newUser);
 //        return 1;
 //    }
-
-
 //    User*userToFind= new User();
 //    userToFind->setUserID(uName);
 //    userToFind->setPassword(pass);
@@ -298,8 +397,6 @@ void addUserToFile(const string& fileName, User userToAdd){
 //    it=find(allUsersVec.begin(),allUsersVec.end(),*userToFind);
 //
 //    cout<<"Found user: "<<it->getUserID()<<" "<<it->getPassword()<<endl;
-
-
 //GIVEN:
 //----------------------------------------------------
     // Initialize Winsock.
@@ -356,4 +453,3 @@ void addUserToFile(const string& fileName, User userToAdd){
 //        printf( "Client Closed.\n");
 //    }
 //    closesocket(listenSocket);
-
