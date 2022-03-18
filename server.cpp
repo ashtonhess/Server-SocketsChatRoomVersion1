@@ -51,13 +51,11 @@ void printUsers(vector<User> usersVec);
 void addUserToFile(const string& fileName, User userToAdd);
 vector<string> split (const string &s, char delim);
 
-//returning 0 for success, 1 for failure.
+//SERVER
 int main(int argc, char*argv[]){
 try{
-
     string fileName = "users.txt";
-    const char *welcomeMsg = "> Ashton's chat room server. Version One.\n";
-
+    const char *welcomeMsg = "Ashton's chat room server. Version One.\n";
     vector<User> users;
     //Ensure error checks on size of users after reading in file data.
     users = readUsersFromFile(fileName);
@@ -65,9 +63,6 @@ try{
     int serverFD;
     //stores the accepted socket connection
     int currentSocket;
-    /*//Buffer to hold current message.
-      char msgBuf[MAX_LINE] = {};*/
-
     //setting up my socket.
     //creating FD (file descriptor) for socket.
     if ((serverFD = socket(AF_INET,SOCK_STREAM,0)) == 0){
@@ -96,37 +91,40 @@ try{
         cout<<"> Error: listening on socket."<<endl;
         return 1;
     }
-
+    //printing message to server user.
     cout<<welcomeMsg<<endl;
-    //cout<<"Waiting for a client to connect..."<<endl;
-
     string userID;
     bool logInStatus=false;
     bool while1=true;
     bool while2=true;
     while(while1) {
         while2=true;
+        //accepting and storing a socket connection
         if ((currentSocket = accept(serverFD, (struct sockaddr *) &addy, (socklen_t *) &addy)) < 0) {
             cout<<"> Error: accepting the socket."<<endl;
             return 1;
         }
+        logInStatus = false;
         while(while2){
             char buffer[MAX_LINE] ="";
             char placeholder[MAX_LINE]="";
             long int i = recv(currentSocket, buffer, MAX_LINE, 0);
-            //cout<<"VALUE OF I: "<<i<<endl;
+            //checking received value for errors.
             if (i==-1){
                 close(currentSocket);
-                cout<<"> Error: Closed socket."<<endl;
+                cout<<"Closed socket. Client disconnected."<<endl;
                 break;
             }
+            //uncomment to see what is being received each time.
             //cout<<buffer<<endl;
             string storedBuffer;
             if (!storedBuffer.empty()){
                 storedBuffer= buffer;
             }
+            //breaking up the string into pieces (see split function)
             vector<string> delimitVec;
             delimitVec = split(buffer,' ');
+            //checking what command is received
             if (delimitVec.at(0)=="login"){
                     int loginResult= login(delimitVec.at(1),delimitVec.at(2));
                     //return 0 for user does not exist; return 1 for login success; return 2 for wrong password.
@@ -158,6 +156,7 @@ try{
                 }
             }else if (delimitVec.at(0)=="send"){
                 if (logInStatus==true){
+                    //creating message to send back to client
                     string totalMessage=userID+": ";
                     for (auto t=delimitVec.begin()+1; t!=delimitVec.end(); ++t)
                     {
@@ -169,7 +168,6 @@ try{
                     strcpy(buffer, sendMsg);
                     send(currentSocket, buffer, strlen(buffer), 0);
                 }else{
-                    //cout<<"> Denied. Please login first."<<endl;
                     const char *loginBefore= "> Denied. Please login first.";
                     strcpy(buffer, loginBefore);
                     send(currentSocket, buffer, strlen(buffer), 0);
@@ -177,17 +175,18 @@ try{
             }else if (delimitVec.at(0)=="logout") {
                 if (logInStatus == true) {
                     logout(userID);
+                    string totalLogOutMsg="> "+userID+" left.";
                     userID = "";
-                    const char *logoutMsg= "> You left.";
+                    const char *logoutMsg= totalLogOutMsg.c_str();
                     strcpy(buffer, logoutMsg);
                     send(currentSocket, buffer, strlen(buffer), 0);
+                    close(currentSocket);//closing the socket
                 }else{
                     const char *logoutNotLoggedIn= "> Denied. Please login first.";
                     strcpy(buffer, logoutNotLoggedIn);
                     send(currentSocket, buffer, strlen(buffer), 0);
                 }
             }
-
         } //END INNER WHILE
     }//END OUTER WHILE
 }catch(std::out_of_range){
@@ -195,7 +194,8 @@ try{
 }
 return 0;
 }
-
+//This is a helper function that splits a string up into pieces based on the delimiter.
+//It then stores these pieces in a string vector.
 vector<string> split (const string &s, char delim) {
     vector<string> result;
     stringstream ss (s);
@@ -275,13 +275,11 @@ int newUser(string userID, string password){
 //Message size between 1 and 256 characters.
 int sendMessage(char*message){
 
-
     return 0;
 }
 //Quit the chatroom.
 int logout(string userID){
     cout<<userID<<" logout."<<endl;
-  //  cout<<it->getUserID()<<" logout."<<endl;//---------------------------------------------------------------NEEDED--------------------------------------------------------------------------
     return 0;
 }
 
@@ -297,11 +295,17 @@ void addUserToFile(const string& fileName, User userToAdd){
 
 
 
-
+/*//Buffer to hold current message.
+   char msgBuf[MAX_LINE] = {};*/
 
 //TESTING:
+//cout<<"Waiting for a client to connect..."<<endl;
+
+//cout<<"Waiting for a client to connect..."<<endl;
 
 //cout<<"> Denied. User name or password incorrect."<<endl;
+
+//  cout<<it->getUserID()<<" logout."<<endl;//---------------------------------------------------------------NEEDED--------------------------------------------------------------------------
 
 
 //printf("%s\n", msgBuf);
