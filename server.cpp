@@ -36,26 +36,25 @@ int main(int argc, char*argv[]){
     //User*testUser = new User("testUserIDNEW","testPasswordNEW");
     string fileName = "users.txt";
     vector<User> users;
+    //Ensure error checks on size of users after reading in file data.
     users = readUsersFromFile(fileName);
-    //printUsers(users);
-    if (users.empty()){
-        cout<<"ERROR: readUsersFromFile()"<<endl;
-    }
-
+    //Buffer to hold current message.
     char msgBuf[MAX_LINE] = {};
+    //File descriptor for stocket.
     int serverFD;
-    int newSocket;
+    //
+    int currentSocket;
     int valRead;
     int opt = 1;
     //setting up my socket.
     //creating FD (file descriptor) for socket.
     if ((serverFD = socket(AF_INET,SOCK_STREAM,0)) == 0){
-        perror("> Error: Setting server file descriptor.\n");
+        perror("> Error: setting server file descriptor.\n");
         return 1;
     }
     //attaching socket to SERVER_PORT.
     if(setsockopt(serverFD, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt))){
-        perror("> Error: setsockopt()\n");
+        cout<<"> Error: setsockopt()"<<endl;
         return 1;
     }
     struct sockaddr_in addy;
@@ -65,56 +64,46 @@ int main(int argc, char*argv[]){
     //Must use scope resolution operator '::' here to call bind() from the socket import,
     // since I'm using the std namespace. This is because std::bind() also exists.
     if (::bind(serverFD, (struct sockaddr *)&addy, sizeof(addy)) < 0 ){
-        perror("> Error: binding socket.");
+        cout<<"> Error: binding socket."<<endl;
         return 1;
     }
     if (listen(serverFD, MAX_PENDING) < 0) {
         //listening on the socket for a new connection. Next, accept a socket connection and store it
-        perror("> Error: listening on socket.");
+        cout<<"> Error: listening on socket."<<endl;
         return 1;
     }
     cout<<"> Ashton's chat room server. Version One."<<endl<<endl;
     //cout<<"Waiting for a client to connect..."<<endl;
     string userID;
     bool isLoggedIn=false;
-    bool outerWhile=true;
-    bool innerWhile=true;
-    while(true) {
-        innerWhile=true;
-        if ((newSocket = accept(serverFD, (struct sockaddr *) &addy, (socklen_t *) &addy)) < 0) {
-            perror("accept");
+    bool while1=true;
+    bool while2=true;
+    while(while1) {
+        while2=true;
+        if ((currentSocket = accept(serverFD, (struct sockaddr *) &addy, (socklen_t *) &addy)) < 0) {
+            cout<<"> Error: accepting the socket."<<endl;
             return 1;
         }
 
         printf("%s\n", msgBuf);
         const char *welcomeMsg = "Ashton's chat room client. Version 1.";
-        send(newSocket, welcomeMsg, strlen(welcomeMsg), 0);
+        send(currentSocket, welcomeMsg, strlen(welcomeMsg), 0);
         //cout<<"Welcome message sent."<<endl;
-        while(outerWhile){
-
+        while(while2){
             char buffer[MAX_LINE];
             char placeholder[MAX_LINE]="";
             //valRead = read(newSocket, msgBuf, MAX_LINE);
-            int i = recv(newSocket, buffer, MAX_LINE, 0);
+            int i = recv(currentSocket, buffer, MAX_LINE, 0);
             //cout<<"VALUE OF I: "<<i<<endl;
             if (i==-1){
-                close(newSocket);
+                close(currentSocket);
                 cout<<"Error: Closed socket."<<endl;
                 break;
             }
             cout<<buffer<<endl;
-            while(innerWhile){
 
-
-                innerWhile=false;
-            }//END INNER WHILE
 
         } //END OUTER WHILE
-
-
-
-
-
     }
     return 0;
 }
@@ -158,10 +147,6 @@ int main(int argc, char*argv[]){
 //                }
 //
 //            }
-
-
-
-
 
 
 vector<string> split (const string &s, char delim) {
@@ -218,10 +203,7 @@ vector<User> readUsersFromFile(const string& fileName) {
         return errorVector;
     }
 }
-//return 0 for user does not exist
-//return 1 for login success
-//return 2 for wrong password
-//int login(char*uName, char*pass){
+//return 0 for user does not exist; return 1 for login success; return 2 for wrong password.
 int login(string uName, string pass){
     vector<User> allUsersVec;
     allUsersVec=readUsersFromFile("users.txt");
@@ -234,12 +216,8 @@ int login(string uName, string pass){
     }
     return 0;
 }
-//Create a new user account
-//returns 0 if userID account already exists
-//returns 1 if user successfully added.
-//int newUser(char*userID, char*password){
+//Create a new user account; returns 0 if userID account already exists; returns 1 if user successfully added.
 int newUser(string userID, string password){
-
     if (login(userID, password)==1 || login(userID,password)==2){
         return 0;
     }else{
@@ -248,6 +226,21 @@ int newUser(string userID, string password){
         return 1;
     }
 }
+//Send a message to other clients; specifically: send the message to the server and the server forwards the message to other clients.
+//Message size between 1 and 256 characters.
+int sendMessage(char*message){
+
+
+    return 0;
+}
+//Quit the chatroom.
+int logout(){
+
+
+    return 0;
+}
+
+
 void addUserToFile(const string& fileName, User userToAdd){
     string userString;
     userString="("+userToAdd.getUserID()+","+" "+userToAdd.getPassword()+")";
@@ -256,14 +249,9 @@ void addUserToFile(const string& fileName, User userToAdd){
     outFile.open(fileName, std::ios_base::app);
     outFile<<endl<<userString;
 }
-//Send a message to other clients; actually send the message to the server and the server forwards the message to other clients
-int sendMessage(char*message){
-    return 0;
-}
-//quit the chatroom
-int logout(){
-    return 0;
-}
+
+
+
 
 
 
