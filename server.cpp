@@ -21,6 +21,20 @@
 //
 // Note: To clean, run make clean in both project directories.
 //
+//Server output:
+/*
+ashtonhess@Bushes-Pro-2 server % ./server
+Ashton's chat room server. Version One.
+
+New user account created.
+Tom login.
+Tom: Hello, is anybody out there?
+Tom: Bye for now.
+Tom logout.
+Closed socket. Client disconnected.
+
+(Program is still running down here. Just waiting for a client to connect again.)
+*/
 #include <iostream>
 using namespace std;
 #include <unistd.h>
