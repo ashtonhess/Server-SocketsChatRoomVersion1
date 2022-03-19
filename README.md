@@ -1,5 +1,4 @@
 # Server-SocketsChatRoomVersion1
-# Client-SocketsChatRoomVersion1
 //
 // Created by Ashton Hess on 3/17/22. -> Migrating so I can use my Mac. Now using makefiles instead of VS.
 // Pawprint: AAHB8F
